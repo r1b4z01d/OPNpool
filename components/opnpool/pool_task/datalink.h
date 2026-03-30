@@ -71,6 +71,8 @@ struct datalink_addr_t {
     static constexpr uint8_t CHLORINATOR          = 0x50;
     static constexpr uint8_t PUMP_BASE            = 0x60;  ///< base value for pump addresses
     static constexpr uint8_t PUMP_ID_MASK         = 0x0F;  ///< mask to extract pump ID (low nibble)
+    static constexpr uint8_t HEATER_BASE          = 0x70;  ///< base value for heater addresses (UltraTemp, MasterTemp)
+    static constexpr uint8_t HEATER_ID_MASK       = 0x0F;  ///< mask to extract heater ID (low nibble)
     static constexpr uint8_t BROADCAST            = 0x0F;  ///< broadcast address
     static constexpr uint8_t UNKNOWN_90           = 0x90;
 
@@ -90,6 +92,7 @@ struct datalink_addr_t {
     constexpr bool is_controller()  const { return (addr == SUNTOUCH_CONTROLLER || addr == EASYTOUCH_CONTROLLER); }
     constexpr bool is_remote()      const { return (addr == REMOTE || addr == WIRELESS_REMOTE || addr == QUICKTOUCH_REMOTE); }
     constexpr bool is_pump()        const { return (addr & 0xF0) == PUMP_BASE; }
+    constexpr bool is_heater()      const { return (addr & 0xF0) == HEATER_BASE; }
     constexpr bool is_unknown_90()  const { return addr == UNKNOWN_90; }
     constexpr bool is_chlorinator() const { return addr == CHLORINATOR; } 
     constexpr bool is_broadcast()   const { return addr == BROADCAST; }

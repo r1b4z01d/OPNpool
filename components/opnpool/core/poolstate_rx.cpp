@@ -1058,6 +1058,12 @@ update_state(network_msg_t const * const msg, poolstate_t * const new_state)
             break;
         case network_msg_typ_t::CTRL_CHEM_REQ:
             break;
+        case network_msg_typ_t::HEATER_SET:
+            _ctrl_hex_bytes(dbg, msg->u.raw, sizeof(network_heater_set_t));
+            break;
+        case network_msg_typ_t::HEATER_RESP:
+            _ctrl_hex_bytes(dbg, msg->u.raw, sizeof(network_heater_resp_t));
+            break;
         case network_msg_typ_t::CHLOR_CONTROL_REQ:
             _chlor_control_req(dbg, &msg->u.ic.chlor_control_req);
             break;
