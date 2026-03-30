@@ -17,6 +17,7 @@
 
 #include <esp_system.h>
 #include <esp_types.h>
+#include <esp_log.h>
 #include <esphome/core/log.h>
 
 #include "utils/to_str.h"
@@ -85,7 +86,9 @@ _decode_msg_a5_ctrl(datalink_pkt_t const * const pkt, network_msg_t * const msg)
 
     network_msg_typ_info_t const * const info = network_msg_typ_get_info(datalink_ctrl_typ);
     if (info == nullptr) {
-        ESP_LOGW(TAG, "unsupported ctrl_typ (%s) ", enum_str(datalink_ctrl_typ));
+        ESP_LOGW(TAG, "unsupported ctrl_typ (%s) src=0x%02X dst=0x%02X len=%u",
+                 enum_str(datalink_ctrl_typ), pkt->src.addr, pkt->dst.addr, pkt->data_len);
+        ESP_LOG_BUFFER_HEX_LEVEL(TAG, pkt->data, pkt->data_len, ESP_LOG_WARN);
         return ESP_FAIL;
     }
 
