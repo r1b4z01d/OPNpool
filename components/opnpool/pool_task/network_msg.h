@@ -254,7 +254,31 @@ struct network_ctrl_delay_resp_t {
 } PACK8;
 
 struct network_ctrl_heat_setpt_resp_t {
-    uint8_t unknown[10];  // 00 00 00 00 00 00 00 00 00 00 
+    uint8_t unknown[10];  // 00 00 00 00 00 00 00 00 00 00
+} PACK8;
+
+/// @brief UltraTemp/MasterTemp heat pump operating modes.
+enum class network_heater_mode_t : uint8_t {
+    OFF  = 0x00,  ///< Heater off
+    HEAT = 0x01,  ///< Heat mode
+    COOL = 0x02,  ///< Cool mode
+};
+
+/// @brief Controller → heater command (action 0x72 / 114). Sets operating mode.
+struct network_heater_set_t {
+    uint8_t               cmd;         // 0  always 0x90
+    network_heater_mode_t mode;        // 1  0=off, 1=heat, 2=cool
+    uint8_t               unknown_2;   // 2
+    uint8_t               temp_offset; // 3  temperature offset
+    uint8_t               unknown[6];  // 4..9
+} PACK8;
+
+/// @brief Heater → controller response (action 0x73 / 115). Reports current mode and status.
+struct network_heater_resp_t {
+    uint8_t               cmd;        // 0  always 0xA0
+    network_heater_mode_t mode;       // 1  current operating mode
+    uint8_t               status;     // 2  heater status flags
+    uint8_t               unknown[7]; // 3..9
 } PACK8;
 
 struct network_ctrl_circ_names_req_t {
@@ -511,6 +535,8 @@ union network_data_a5_t {
     network_ctrl_solarpump_resp_t  ctrl_solarpump_resp;
     network_ctrl_delay_resp_t      ctrl_delay_resp;
     network_ctrl_heat_setpt_resp_t ctrl_heat_setpt_resp;
+    network_heater_set_t           heater_set;
+    network_heater_resp_t          heater_resp;
     network_ctrl_circ_names_req_t  ctrl_circ_names_req;
     network_ctrl_circ_names_resp_t ctrl_circ_names_resp;
     network_ctrl_scheds_req_t      ctrl_scheds_req;
@@ -598,6 +624,8 @@ union network_data_t {
     X(CTRL_SCHEDS_REQ,       sizeof(network_ctrl_scheds_req_t),     false, A5_CTRL, datalink_ctrl_typ_t::SCHEDS_REQ)    \
     X(CTRL_SCHEDS_RESP,      sizeof(network_ctrl_scheds_resp_t),    false, A5_CTRL, datalink_ctrl_typ_t::SCHEDS_RESP)   \
     X(CTRL_CHEM_REQ,         sizeof(network_ctrl_chem_req_t),       false, A5_CTRL, datalink_ctrl_typ_t::CHEM_REQ)      \
+    X(HEATER_SET,            sizeof(network_heater_set_t),          false, A5_CTRL, datalink_ctrl_typ_t::HEATER_SET)    \
+    X(HEATER_RESP,           sizeof(network_heater_resp_t),         false, A5_CTRL, datalink_ctrl_typ_t::HEATER_RESP)   \
     X(CHLOR_CONTROL_REQ,     sizeof(network_chlor_control_req_t),   false, IC,      datalink_chlor_typ_t::CONTROL_REQ)  \
     X(CHLOR_CONTROL_RESP,    sizeof(network_chlor_control_resp_t),  false, IC,      datalink_chlor_typ_t::CONTROL_RESP) \
     X(CHLOR_MODEL_REQ,       sizeof(network_chlor_model_req_t),     false, IC,      datalink_chlor_typ_t::MODEL_REQ)    \

@@ -96,6 +96,8 @@ enum class datalink_ctrl_typ_t : uint8_t {
     DELAY_REQ        = 0xE3,
     HEAT_SETPT_RESP  = 0x28,
     HEAT_SETPT_REQ   = 0xE8,
+    HEATER_SET       = 0x72,  ///< Controller → heater: set operating mode (off/heat/cool)
+    HEATER_RESP      = 0x73,  ///< Heater → controller: current mode and status
     VERSION_RESP     = 0xFC,
     VERSION_REQ      = 0xFD
     // SPA_CTRL_REQ     = 0xD6,
