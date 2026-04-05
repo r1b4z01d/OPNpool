@@ -187,9 +187,9 @@ _publish_date_and_time_if(OpnPoolTextSensor * const sensor, poolstate_tod_t cons
 static void
 _publish_version_if(OpnPoolTextSensor * const sensor, poolstate_system_t const * const system)
 {
-    if (sensor != nullptr && system != nullptr && system->addr.valid && system->version.valid) {
-        static char fw_str[18];  // 2.80\0
-        snprintf(fw_str, sizeof(fw_str), "%s %d.%d", system->addr.value.to_str(), system->version.major, system->version.minor);
+    if (sensor != nullptr && system != nullptr && system->version.valid) {
+        static char fw_str[24];  // "Easy/Sun Touch 99.999\0"
+        snprintf(fw_str, sizeof(fw_str), "Easy/Sun Touch %d.%03d", system->version.major, system->version.minor);
         sensor->publish_value_if_changed(fw_str);
     }
 }
