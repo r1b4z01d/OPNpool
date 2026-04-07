@@ -51,14 +51,15 @@ enum class switch_id_t : uint8_t {
 
     /// @brief Sensor entity identifiers for pool measurements.
 enum class sensor_id_t : uint8_t {
-    AIR_TEMPERATURE    = 0,  ///< Ambient air temperature sensor.
-    WATER_TEMPERATURE  = 1,  ///< Pool/spa water temperature sensor.
-    PRIMARY_PUMP_POWER = 2,  ///< Primary pump power consumption sensor.
-    PRIMARY_PUMP_FLOW  = 3,  ///< Primary pump flow rate sensor.
-    PRIMARY_PUMP_SPEED = 4,  ///< Primary pump speed (RPM) sensor.
-    CHLORINATOR_LEVEL  = 5,  ///< Chlorinator output level sensor.
-    CHLORINATOR_SALT   = 6,  ///< Chlorinator salt level sensor.
-    PRIMARY_PUMP_ERROR = 7   ///< Primary pump error code sensor.
+    AIR_TEMPERATURE      = 0,  ///< Ambient air temperature sensor.
+    WATER_TEMPERATURE    = 1,  ///< Pool/spa water temperature sensor.
+    PRIMARY_PUMP_POWER   = 2,  ///< Primary pump power consumption sensor.
+    PRIMARY_PUMP_FLOW    = 3,  ///< Primary pump flow rate sensor.
+    PRIMARY_PUMP_SPEED   = 4,  ///< Primary pump speed (RPM) sensor.
+    CHLORINATOR_LEVEL    = 5,  ///< Chlorinator output level sensor.
+    CHLORINATOR_SALT     = 6,  ///< Chlorinator salt level sensor.
+    PRIMARY_PUMP_ERROR   = 7,  ///< Primary pump error code sensor.
+    SOLAR_TEMPERATURE  = 8   ///< Solar sensor temperature.
 };
 
     /// @brief Binary sensor entity identifiers for pool status indicators.

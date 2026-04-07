@@ -196,21 +196,18 @@ _update_system_time(cJSON * const dbg, network_ctrl_state_bcast_t const * const 
 static void
 _update_temps(cJSON * const dbg, network_ctrl_state_bcast_t const * const msg, poolstate_uint8_t * const temps)
 {
-    uint8_t const air_idx = enum_index(poolstate_temp_typ_t::AIR);
-    uint8_t const water_idx = enum_index(poolstate_temp_typ_t::WATER);
-    static_assert(air_idx < enum_count<poolstate_temp_typ_t>(), "size err for air_idx");
+    uint8_t const air_idx     = enum_index(poolstate_temp_typ_t::AIR);
+    uint8_t const water_idx   = enum_index(poolstate_temp_typ_t::WATER);
+    uint8_t const solar_idx   = enum_index(poolstate_temp_typ_t::SOLAR);
+    static_assert(air_idx   < enum_count<poolstate_temp_typ_t>(), "size err for air_idx");
     static_assert(water_idx < enum_count<poolstate_temp_typ_t>(), "size err for water_idx");
+    static_assert(solar_idx < enum_count<poolstate_temp_typ_t>(), "size err for solar_idx");
 
-    temps[air_idx] = {
-        .valid = true,
-        .value = msg->solar_temp_1 // 2BD should probably be air_temp on other systems
-    };
-    temps[water_idx] = {
-        .valid = true,
-        .value = msg->pool_temp
-    };
+    temps[air_idx]   = { .valid = true, .value = msg->air_temp     };
+    temps[water_idx] = { .valid = true, .value = msg->pool_temp    };
+    temps[solar_idx] = { .valid = true, .value = msg->solar_temp_1 };
 
-    ESP_LOGVV(TAG, "Air %u, Spa %u, Water %u Solar1 %u, Solar2 %u", msg->air_temp, msg->spa_temp, msg->pool_temp, msg->solar_temp_1, msg->solar_temp_2);
+    ESP_LOGVV(TAG, "Air %u, Spa %u, Water %u Solar1 %u", msg->air_temp, msg->spa_temp, msg->pool_temp, msg->solar_temp_1);
 
     if (ESPHOME_LOG_LEVEL >= ESPHOME_LOG_LEVEL_VERBOSE) {
         poolstate_rx_log::add_temps(dbg, poolstate_rx_log::KEY_TEMPS, temps);
