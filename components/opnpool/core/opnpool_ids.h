@@ -71,6 +71,11 @@ enum class binary_sensor_id_t : uint8_t {
     MODE_TIMEOUT           = 4   ///< Timeout mode active indicator.
 };
 
+    /// @brief Number entity identifiers for pool numeric controls.
+enum class number_id_t : uint8_t {
+    PRIMARY_PUMP_SPEED_SETPOINT = 0,  ///< Primary pump speed setpoint (RPM).
+};
+
     /// @brief Text sensor entity identifiers for pool status strings.
 enum class text_sensor_id_t : uint8_t {
     POOL_SCHED          = 0,  ///< Pool schedule information.

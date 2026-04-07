@@ -48,6 +48,7 @@
 #include "entities/opnpool_sensor.h"
 #include "entities/opnpool_binary_sensor.h"
 #include "entities/opnpool_text_sensor.h"
+#include "entities/opnpool_number.h"
 #include "opnpool_ids.h"
 #include "pool_task/network.h"
 #include "pool_task/network_msg.h"
@@ -390,6 +391,7 @@ OpnPool::loop() {
                 this->update_text_sensors(&new_state);
                 this->update_analog_sensors(&new_state);
                 this->update_binary_sensors(&new_state);
+                this->update_numbers(&new_state);
             }
  
             ESP_LOGVV(TAG, "FYI Poolstate changed");
@@ -597,6 +599,21 @@ OpnPool::update_binary_sensors(poolstate_t const * const state)
 }
 
 /**
+ * @brief Updates number entities with current pool state.
+ *
+ * @param[in] state Pointer to the current pool state.
+ */
+void
+OpnPool::update_numbers(poolstate_t const * const state)
+{
+    OpnPoolNumber * const speed_number = this->numbers_[enum_index(number_id_t::PRIMARY_PUMP_SPEED_SETPOINT)];
+    auto const & speed = state->pumps[enum_index(datalink_pump_id_t::PRIMARY)].speed;
+    if (speed_number != nullptr && speed.valid) {
+        speed_number->publish_value_if_changed(static_cast<float>(speed.value));
+    }
+}
+
+/**
  * @brief Updates text sensor entities with current pool state.
  *
  * @param[in] state Pointer to the current pool state.
@@ -775,6 +792,12 @@ void
 OpnPool::set_solar_temperature_sensor(OpnPoolSensor * const s)
 {
     this->sensors_[enum_index(sensor_id_t::SOLAR_TEMPERATURE)] = s;
+}
+
+void
+OpnPool::set_primary_pump_speed_setpoint_number(OpnPoolNumber * const n)
+{
+    this->numbers_[enum_index(number_id_t::PRIMARY_PUMP_SPEED_SETPOINT)] = n;
 }
 
 void
