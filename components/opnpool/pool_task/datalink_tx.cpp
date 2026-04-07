@@ -44,7 +44,7 @@ constexpr size_t DBG_SIZE = 128;
 constexpr size_t DATALINK_PREAMBLE_IC_SIZE = sizeof(datalink_preamble_ic);
 constexpr size_t DATALINK_PREAMBLE_A5_SIZE = sizeof(datalink_preamble_a5);
 
-constexpr uint8_t A5_PROTOCOL_VERSION = 0x01;
+// A5_PROTOCOL_VERSION is now taken from datalink_pkt_t::ver (learned from controller broadcasts)
 
 /**
  * @brief          Fills the IC protocol packet header fields for transmission.
@@ -86,13 +86,13 @@ _enter_ic_tail(datalink_tail_ic_t * const tail, uint8_t const * const start, uin
  * @param[in]  data_len Length of the data payload.
  */
 static void
-_enter_a5_head(datalink_head_a5_t * const head, datalink_addr_t const src, datalink_addr_t const dst, datalink_typ_t const typ, size_t const data_len)
+_enter_a5_head(datalink_head_a5_t * const head, datalink_addr_t const src, datalink_addr_t const dst, datalink_typ_t const typ, size_t const data_len, uint8_t const ver)
 {
     head->ff = 0xFF;
     for (uint_least8_t ii = 0; ii < DATALINK_PREAMBLE_A5_SIZE; ii++) {
         head->preamble[ii] = datalink_preamble_a5[ii];
     }
-    head->hdr.ver = A5_PROTOCOL_VERSION;
+    head->hdr.ver = ver;
     head->hdr.src = src;
     head->hdr.dst = dst;
     head->hdr.typ = typ.raw;
@@ -146,7 +146,7 @@ datalink_tx_pkt_queue(rs485_handle_t const rs485, datalink_pkt_t const * const p
         case datalink_prot_t::A5_CTRL:
         case datalink_prot_t::A5_PUMP: {
             datalink_head_a5_t * const head = (datalink_head_a5_t *) skb_push(skb, sizeof(datalink_head_a5_t));
-            _enter_a5_head(head, pkt->src, pkt->dst, pkt->typ, pkt->data_len);
+            _enter_a5_head(head, pkt->src, pkt->dst, pkt->typ, pkt->data_len, pkt->ver);
 
             uint8_t * checksum_start = head->preamble + DATALINK_PREAMBLE_A5_SIZE - 1;
             uint8_t * checksum_stop = skb->priv.tail;
