@@ -539,11 +539,23 @@ OpnPool::update_analog_sensors(poolstate_t const * const state)
 
     OpnPoolSensor * const water_temperature_sensor = this->sensors_[enum_index(sensor_id_t::WATER_TEMPERATURE)];
     auto const water_temp = state->temps[enum_index(poolstate_temp_typ_t::WATER)];
-    if (water_temperature_sensor != nullptr && water_temp.valid) {    
-        //auto water_temp_c = fahrenheit_to_celsius(water_temp.value);
-        //water_temp_c = std::round(water_temp_c * 10.0f) / 10.0f;
+    if (water_temperature_sensor != nullptr && water_temp.valid) {
         auto water_temp_f =std::round(water_temp.value * 10.0f) / 10.0f;
         water_temperature_sensor->publish_value_if_changed(water_temp_f);
+    }
+
+    OpnPoolSensor * const solar1_sensor = this->sensors_[enum_index(sensor_id_t::SOLAR_TEMPERATURE_1)];
+    auto const solar1_temp = state->temps[enum_index(poolstate_temp_typ_t::SOLAR_1)];
+    if (solar1_sensor != nullptr && solar1_temp.valid) {
+        auto solar1_temp_f = std::round(solar1_temp.value * 10.0f) / 10.0f;
+        solar1_sensor->publish_value_if_changed(solar1_temp_f);
+    }
+
+    OpnPoolSensor * const solar2_sensor = this->sensors_[enum_index(sensor_id_t::SOLAR_TEMPERATURE_2)];
+    auto const solar2_temp = state->temps[enum_index(poolstate_temp_typ_t::SOLAR_2)];
+    if (solar2_sensor != nullptr && solar2_temp.valid) {
+        auto solar2_temp_f = std::round(solar2_temp.value * 10.0f) / 10.0f;
+        solar2_sensor->publish_value_if_changed(solar2_temp_f);
     }   
     _publish_if(
         this->sensors_[enum_index(sensor_id_t::PRIMARY_PUMP_POWER)],        
@@ -724,8 +736,20 @@ OpnPool::set_air_temperature_sensor(OpnPoolSensor * const s)
 
 void
 OpnPool::set_water_temperature_sensor(OpnPoolSensor * const s)
-{ 
-    this->sensors_[enum_index(sensor_id_t::WATER_TEMPERATURE)] = s; 
+{
+    this->sensors_[enum_index(sensor_id_t::WATER_TEMPERATURE)] = s;
+}
+
+void
+OpnPool::set_solar_temperature_1_sensor(OpnPoolSensor * const s)
+{
+    this->sensors_[enum_index(sensor_id_t::SOLAR_TEMPERATURE_1)] = s;
+}
+
+void
+OpnPool::set_solar_temperature_2_sensor(OpnPoolSensor * const s)
+{
+    this->sensors_[enum_index(sensor_id_t::SOLAR_TEMPERATURE_2)] = s;
 }
 
 void
