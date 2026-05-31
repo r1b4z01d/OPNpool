@@ -94,8 +94,9 @@ struct datalink_addr_t {
     constexpr bool is_pump()        const { return (addr & 0xF0) == PUMP_BASE; }
     constexpr bool is_heater()      const { return (addr & 0xF0) == HEATER_BASE; }
     constexpr bool is_unknown_90()  const { return addr == UNKNOWN_90; }
-    constexpr bool is_chlorinator() const { return addr == CHLORINATOR; } 
+    constexpr bool is_chlorinator() const { return addr == CHLORINATOR; }
     constexpr bool is_broadcast()   const { return addr == BROADCAST; }
+    constexpr bool is_all()         const { return addr == ALL; }  ///< IC responses to the controller use dst 0x00
     constexpr char const * to_str() const { return addr == SUNTOUCH_CONTROLLER  ? "Suntouch" :
                                                    addr == EASYTOUCH_CONTROLLER ? "EasyTouch" : "unknown"; }
 
