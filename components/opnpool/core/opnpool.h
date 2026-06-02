@@ -22,10 +22,16 @@
 
 #include <esp_system.h>
 #include <esp_types.h>
+#include <string>
 #include <esphome/core/component.h>
+#include <esphome/core/defines.h>
 
 #include "utils/enum_helpers.h"
 #include "opnpool_ids.h"
+
+#ifdef USE_API
+#include "esphome/components/api/custom_api_device.h"
+#endif
 
 #ifdef USE_MATTER
 #include "matter/matter_bridge.h"
@@ -63,7 +69,11 @@ struct rs485_pins_t {
  * ESPHome ecosystem. Publishes pool state changes to Home Assistant entities
  * and enacts control requests from Home Assistant on the physical equipment.
  */
-class OpnPool : public Component {
+class OpnPool : public Component
+#ifdef USE_API
+              , public api::CustomAPIDevice
+#endif
+{
 
   public:
     void setup() override;      ///< Initializes IPC, spawns pool_task, publishes firmware version.
@@ -147,6 +157,31 @@ class OpnPool : public Component {
     void update_binary_sensors(poolstate_t const * const state);
     void update_numbers(poolstate_t const * const state);
     void update_all(poolstate_t const * const state);
+
+    // ========== Schedules (SCHEDS_SET 0x91 verified on hardware) ==========
+
+    /**
+     * @brief Sends a CTRL_SCHEDS_SET to write one detailed (EasyTouch) schedule slot.
+     *
+     * @param[in] sched_id    Schedule slot id (1..NETWORK_CTRL_SCHEDS_COUNT).
+     * @param[in] circuit_idx Circuit index (network_pool_circuit_t value).
+     * @param[in] start_h     Start hour (0–23).
+     * @param[in] start_m     Start minute (0–59).
+     * @param[in] stop_h      Stop hour (0–23).
+     * @param[in] stop_m      Stop minute (0–59).
+     * @param[in] day_of_week Day bitmask (Mon 0x01 .. Sun 0x40).
+     */
+    void send_schedule(uint8_t sched_id, uint8_t circuit_idx,
+                       uint8_t start_h, uint8_t start_m,
+                       uint8_t stop_h, uint8_t stop_m, uint8_t day_of_week);
+
+#ifdef USE_API_CUSTOM_SERVICES
+    // ========== Home Assistant services (require 'custom_services: true' in api:) ==========
+    /// @brief HA service: log the controller's current schedules as YAML and fire an event.
+    void on_export_schedules();
+    /// @brief HA service: parse a schedules YAML document and write each entry to the controller.
+    void on_import_schedule(std::string yaml);
+#endif
 
     // ========== Accessors ==========
     ipc_t *         get_ipc()              { return ipc_; }                 ///< Returns IPC structure pointer.

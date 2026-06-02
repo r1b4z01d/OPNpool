@@ -223,7 +223,9 @@ rs485_init(rs485_pins_t const * const rs485_pins)
     uart_driver_install(UART_PORT, RX_BUF_SIZE * 2, 0, 0, NULL, 0);  // no tx buffer
     uart_set_mode(UART_PORT, UART_MODE_RS485_HALF_DUPLEX);
 
-    QueueHandle_t const tx_q = xQueueCreate(5, sizeof(rs485_q_msg_t));
+    // Depth 16 (was 5) gives headroom for the one-time startup burst that requests
+    // all 12 detailed schedule slots at once (see pool_req_task).
+    QueueHandle_t const tx_q = xQueueCreate(16, sizeof(rs485_q_msg_t));
     if (tx_q == nullptr) {
         ESP_LOGE(TAG, "Failed to create TX queue");
         return nullptr;

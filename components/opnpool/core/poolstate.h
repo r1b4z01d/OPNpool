@@ -171,6 +171,17 @@ struct poolstate_sched_t {
     uint16_t stop;    ///< Stop time in minutes since midnight.
 };
 
+/// @brief Detailed (EasyTouch "SCHEDS" family) schedule slot: per-slot, with day-of-week.
+/// @details Fields are byte-aligned (no padding) so poolstate_t stays memcmp-comparable.
+struct poolstate_sched_detail_t {
+    bool            valid;           ///< True if this slot has been populated from a response.
+    uint8_t         sched_id;        ///< Schedule slot id (1..NETWORK_CTRL_SCHEDS_COUNT).
+    uint8_t         circuit_plus_1;  ///< Circuit index + 1 (0 = unused slot); circuit = circuit_plus_1 - 1.
+    network_time_t  start;           ///< Start time (hour:minute).
+    network_time_t  stop;            ///< Stop time (hour:minute).
+    uint8_t         day_of_week;     ///< Sunday-first bitmask: bit0 Sun .. bit6 Sat (Mon-Fri = 0x3E).
+};
+
 /// @}
 
 /// @name Temperature Structures
@@ -294,7 +305,8 @@ struct poolstate_t {
     poolstate_circuit_t circuits[enum_count<network_pool_circuit_t>()];  ///< Circuit states.
     poolstate_thermo_t  thermos[enum_count<poolstate_thermo_typ_t>()];   ///< Thermostat states.
     poolstate_uint8_t   temps[enum_count<poolstate_temp_typ_t>()];       ///< Temperature readings.
-    poolstate_sched_t   scheds[enum_count<network_pool_circuit_t>()];    ///< Circuit schedules.
+    poolstate_sched_t   scheds[enum_count<network_pool_circuit_t>()];    ///< Circuit schedules (simple SCHED family).
+    poolstate_sched_detail_t scheds_detail[NETWORK_CTRL_SCHEDS_COUNT];   ///< Detailed EasyTouch schedules (SCHEDS family).
 };
 
 /// @}

@@ -184,6 +184,35 @@ _queue_req(rs485_handle_t const rs485, network_msg_typ_t const typ)
 }
 
 /**
+ * @brief Queues a detailed-schedule (SCHEDS) request for a specific slot.
+ *
+ * Unlike most requests, CTRL_SCHEDS_REQ carries a one-byte payload (the schedule slot id),
+ * so it cannot use the empty-payload _queue_req() helper.
+ *
+ * @param[in] rs485    RS-485 handle for queuing outgoing packets.
+ * @param[in] sched_id Schedule slot id to request (1..NETWORK_CTRL_SCHEDS_COUNT).
+ */
+static void
+_queue_scheds_req(rs485_handle_t const rs485, uint8_t const sched_id)
+{
+    network_msg_t msg = {};
+    msg.typ = network_msg_typ_t::CTRL_SCHEDS_REQ;
+    msg.src = datalink_addr_t::remote();  // pretend we're a remote control
+    msg.dst = _controller_addr;
+    msg.u.a5.ctrl_scheds_req.sched_id = sched_id;
+
+    datalink_pkt_t * const pkt = static_cast<datalink_pkt_t*>(calloc(1, sizeof(datalink_pkt_t)));
+
+    if (network_create_pkt(&msg, pkt) == ESP_OK) {
+        pkt->ver = _a5_ctrl_version;  // use learned controller version
+        datalink_tx_pkt_queue(rs485, pkt);  // pkt and pkt->skb freed by mailbox recipient
+    } else {
+        if (pkt->skb) free(pkt->skb);
+        free(pkt);
+    }
+}
+
+/**
  * @brief Forwards a queued packet from the transmit queue to the RS-485 bus.
  *
  * Dequeues a single packet from the RS-485 transmit queue and sends it on the bus.
@@ -267,6 +296,21 @@ pool_req_task(void * rs485_void)
 
         _queue_req(rs485, network_msg_typ_t::CTRL_HEAT_REQ);
         _queue_req(rs485, network_msg_typ_t::CTRL_SCHED_REQ);
+
+            // detailed (EasyTouch) schedule slots: request ALL of them once on the first
+            // cycle (so export/import sees the full set within seconds), then rotate one
+            // slot per cycle to pick up ongoing changes without flooding the bus.
+        static bool    initial_scheds_done = false;
+        static uint8_t scheds_req_id       = 1;
+        if (!initial_scheds_done) {
+            for (uint8_t id = 1; id <= NETWORK_CTRL_SCHEDS_COUNT; id++) {
+                _queue_scheds_req(rs485, id);
+            }
+            initial_scheds_done = true;
+        } else {
+            _queue_scheds_req(rs485, scheds_req_id);
+            scheds_req_id = (scheds_req_id % NETWORK_CTRL_SCHEDS_COUNT) + 1;
+        }
     }
 }
 

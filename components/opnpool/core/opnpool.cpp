@@ -30,6 +30,9 @@
 
 #include <esp_system.h>
 #include <esp_types.h>
+#include <string>
+#include <cctype>
+#include <cstdlib>
 #include <esphome/core/log.h>
 #include <esphome/core/hal.h>
 
@@ -297,6 +300,13 @@ OpnPool::setup() {
             interface_firmware->publish_state("unknown");
 #endif
     }
+
+#ifdef USE_API_CUSTOM_SERVICES
+        // expose Home Assistant services for schedule export/import
+        // (requires 'custom_services: true' in the api: section)
+    register_service(&OpnPool::on_export_schedules, "export_schedules");
+    register_service(&OpnPool::on_import_schedule, "import_schedule", {"yaml"});
+#endif
 
 #ifdef USE_MATTER
         // Initialize Matter bridge if configured
@@ -902,6 +912,227 @@ OpnPool::set_interface_firmware_text_sensor(OpnPoolTextSensor * const ts)
 {
     this->text_sensors_[enum_index(text_sensor_id_t::INTERFACE_FIRMWARE)] = ts;
 }
+
+// ============================================================================
+// Schedules (SCHEDS_SET opcode 0x91 verified on hardware via CTRL_SET_ACK)
+// ============================================================================
+
+void
+OpnPool::send_schedule(uint8_t const sched_id, uint8_t const circuit_idx,
+                       uint8_t const start_h, uint8_t const start_m,
+                       uint8_t const stop_h, uint8_t const stop_m, uint8_t const day_of_week)
+{
+    if (poolState_ == nullptr) { return; }
+
+    poolstate_t state;
+    poolState_->get(&state);
+
+    datalink_addr_t const controller_addr = state.system.addr.value;
+    if (!controller_addr.is_controller()) {
+        ESP_LOGW(TAG, "Controller address still unknown, cannot send schedule");
+        return;
+    }
+
+    auto const circuit = static_cast<network_pool_circuit_t>(circuit_idx);
+
+    network_msg_t msg = {};
+    msg.src = datalink_addr_t::wireless_remote();  // 0x22 (ScreenLogic/wireless remote)
+    msg.dst = controller_addr;
+    msg.typ = network_msg_typ_t::CTRL_SCHEDS_SET;
+    msg.u.a5.ctrl_scheds_set = {
+        .sched_id       = sched_id,
+        .circuit_plus_1 = static_cast<uint8_t>(circuit_idx + 1),  // controller uses circuit+1 (0x01 => SPA)
+        .start          = { .hour = start_h, .minute = start_m },
+        .stop           = { .hour = stop_h,  .minute = stop_m  },
+        .day_of_week    = day_of_week,
+    };
+
+    ESP_LOGI(TAG, "SCHEDS_SET id=%u circuit=%s(+1=%u) %02u:%02u-%02u:%02u days=0x%02X",
+             sched_id, enum_str(circuit), circuit_idx + 1, start_h, start_m, stop_h, stop_m, day_of_week);
+
+    if (ipc_send_network_msg_to_pool_task(&msg, ipc_) != ESP_OK) {
+        ESP_LOGW(TAG, "Failed to queue SCHEDS_SET message");
+    }
+}
+
+#ifdef USE_API_CUSTOM_SERVICES
+
+// ---- minimal YAML-subset helpers for the export/import services ----
+
+/**
+ * @brief Renders a day-of-week bitmask as a 7-char positional string (Sun→Sat).
+ *
+ * @details Bit i maps to string position i: bit0 Sun, bit1 Mon, bit2 Tue, bit3 Wed,
+ *          bit4 Thu, bit5 Fri, bit6 Sat (confirmed against the controller; Mon-Fri = 0x3E).
+ *
+ * @param[in]  mask Sunday-first day bitmask.
+ * @param[out] out  Buffer of at least 8 bytes; receives e.g. "-MTWTF-" + NUL.
+ */
+static void
+_days_mask_to_str(uint8_t const mask, char * const out)
+{
+    static char const letters[7] = {'S', 'M', 'T', 'W', 'T', 'F', 'S'};  // Sun..Sat
+    for (int i = 0; i < 7; i++) {
+        out[i] = (mask & (1 << i)) ? letters[i] : '-';
+    }
+    out[7] = '\0';
+}
+
+/// @brief Strips surrounding whitespace and double-quotes from a token.
+static std::string
+_trim(std::string const & s)
+{
+    size_t const a = s.find_first_not_of(" \t\r\n\"");
+    if (a == std::string::npos) { return ""; }
+    size_t const b = s.find_last_not_of(" \t\r\n\"");
+    return s.substr(a, b - a + 1);
+}
+
+/// @brief Parses "HH:MM" into hour/minute; returns false if out of range or malformed.
+static bool
+_parse_hhmm(std::string const & v, uint8_t & h, uint8_t & m)
+{
+    size_t const colon = v.find(':');
+    if (colon == std::string::npos) { return false; }
+    int const hh = atoi(v.substr(0, colon).c_str());
+    int const mm = atoi(v.substr(colon + 1).c_str());
+    if (hh < 0 || hh > 23 || mm < 0 || mm > 59) { return false; }
+    h = static_cast<uint8_t>(hh);
+    m = static_cast<uint8_t>(mm);
+    return true;
+}
+
+/// @brief Converts a 7-char positional day string (Mon→Sun) to a bitmask. Non-'-' = on.
+static uint8_t
+_days_str_to_mask(std::string const & v)
+{
+    uint8_t mask = 0;
+    for (size_t i = 0; i < v.size() && i < 7; i++) {
+        char const c = v[i];
+        if (c != '-' && c != ' ' && c != '_') { mask |= static_cast<uint8_t>(1 << i); }
+    }
+    return mask;
+}
+
+/// @brief Resolves a circuit name (e.g. "POOL") to its network_pool_circuit_t index.
+static bool
+_circuit_idx_from_name(std::string name, uint8_t & out_idx)
+{
+    for (auto & c : name) { c = static_cast<char>(toupper(static_cast<unsigned char>(c))); }
+    for (auto const circuit : magic_enum::enum_values<network_pool_circuit_t>()) {
+        if (name == enum_str(circuit)) {
+            out_idx = enum_index(circuit);
+            return true;
+        }
+    }
+    return false;
+}
+
+void
+OpnPool::on_export_schedules()
+{
+    if (poolState_ == nullptr) { return; }
+
+    poolstate_t state;
+    poolState_->get(&state);
+
+    std::string doc = "schedules:\n";
+    char line[128];
+    int count = 0;
+
+    for (auto const & s : state.scheds_detail) {
+        if (!s.valid) { continue; }
+            // skip unused slots (circuit_plus_1 == 0 means no circuit assigned)
+        if (s.circuit_plus_1 == 0 ||
+            s.circuit_plus_1 > enum_count<network_pool_circuit_t>()) { continue; }
+
+        auto const circuit = static_cast<network_pool_circuit_t>(s.circuit_plus_1 - 1);
+        char days[8];
+        _days_mask_to_str(s.day_of_week, days);
+        snprintf(line, sizeof(line),
+                 "  - {id: %u, circuit: %s, start: \"%02u:%02u\", stop: \"%02u:%02u\", days: \"%s\"}\n",
+                 s.sched_id, enum_str(circuit),
+                 s.start.hour, s.start.minute, s.stop.hour, s.stop.minute, days);
+        doc += line;
+        count++;
+    }
+    if (count == 0) { doc += "  []  # no schedules known yet\n"; }
+
+    ESP_LOGI(TAG, "Exported %d schedule(s):\n%s", count, doc.c_str());
+#ifdef USE_API_HOMEASSISTANT_SERVICES
+        // also surface the YAML to HA as an event (requires 'homeassistant_services: true')
+    fire_homeassistant_event("esphome.opnpool_schedules_export", {{"yaml", doc}});
+#endif
+}
+
+void
+OpnPool::on_import_schedule(std::string yaml)
+{
+    int applied = 0;
+    int skipped = 0;
+    size_t pos = 0;
+
+    while (pos < yaml.size()) {
+        size_t const eol = yaml.find('\n', pos);
+        std::string const ln = yaml.substr(pos, eol == std::string::npos ? std::string::npos : eol - pos);
+        pos = (eol == std::string::npos) ? yaml.size() : eol + 1;
+
+            // an entry is a flow-style map: - {id: .., circuit: .., start: .., stop: .., days: ..}
+        size_t const lb = ln.find('{');
+        if (lb == std::string::npos) { continue; }
+        size_t const rb = ln.find('}', lb);
+        if (rb == std::string::npos) { continue; }
+        std::string const body = ln.substr(lb + 1, rb - lb - 1);
+
+        int     id          = -1;
+        int     circuit_idx = -1;
+        uint8_t sh = 0, sm = 0, eh = 0, em = 0;
+        uint8_t days = 0;
+        bool    have_start = false, have_stop = false, have_days = false;
+
+        size_t tpos = 0;
+        while (tpos < body.size()) {
+            size_t const comma = body.find(',', tpos);
+            std::string const tok = body.substr(tpos, comma == std::string::npos ? std::string::npos : comma - tpos);
+            tpos = (comma == std::string::npos) ? body.size() : comma + 1;
+
+            size_t const colon = tok.find(':');
+            if (colon == std::string::npos) { continue; }
+            std::string key = _trim(tok.substr(0, colon));
+            std::string const val = _trim(tok.substr(colon + 1));
+            for (auto & c : key) { c = static_cast<char>(tolower(static_cast<unsigned char>(c))); }
+
+            if (key == "id") {
+                id = atoi(val.c_str());
+            } else if (key == "circuit") {
+                uint8_t ci;
+                if (_circuit_idx_from_name(val, ci)) { circuit_idx = ci; }
+            } else if (key == "start") {
+                have_start = _parse_hhmm(val, sh, sm);
+            } else if (key == "stop") {
+                have_stop = _parse_hhmm(val, eh, em);
+            } else if (key == "days") {
+                days = _days_str_to_mask(val);
+                have_days = true;
+            }
+        }
+
+        if (id < 1 || id > NETWORK_CTRL_SCHEDS_COUNT || circuit_idx < 0 || !have_start || !have_stop) {
+            ESP_LOGW(TAG, "import_schedule: skipping invalid entry: %s", ln.c_str());
+            skipped++;
+            continue;
+        }
+        if (!have_days) { days = 0x7F; }  // default: every day
+
+        this->send_schedule(static_cast<uint8_t>(id), static_cast<uint8_t>(circuit_idx),
+                            sh, sm, eh, em, days);
+        applied++;
+    }
+
+    ESP_LOGI(TAG, "import_schedule: applied=%d skipped=%d", applied, skipped);
+}
+
+#endif  // USE_API_CUSTOM_SERVICES
 
 #ifdef USE_MATTER
 /**

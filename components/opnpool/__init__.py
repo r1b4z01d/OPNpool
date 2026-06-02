@@ -43,7 +43,8 @@ from esphome.const import (
 )
 
 DEPENDENCIES = ["climate", "switch", "sensor", "binary_sensor", "text_sensor", "number", "select"]
-AUTO_LOAD = ["climate", "switch", "sensor", "binary_sensor", "text_sensor", "number", "select"]
+# "api" is auto-loaded so USE_API is defined and the schedule export/import services register.
+AUTO_LOAD = ["climate", "switch", "sensor", "binary_sensor", "text_sensor", "number", "select", "api"]
 
 # namespace and class definitions
 opnpool_ns = cg.esphome_ns.namespace("opnpool")
