@@ -86,6 +86,7 @@ enum class datalink_ctrl_typ_t : uint8_t {
     CIRC_NAMES_RESP  = 0x0B,
     CIRC_NAMES_REQ   = 0xCB,
     SCHEDS_RESP      = 0x11,
+    SCHEDS_SET       = 0x91,  ///< Set a detailed schedule slot. Verified on hardware: controller replies CTRL_SET_ACK{SCHEDS_SET}.
     SCHEDS_REQ       = 0xD1,
     CHEM_RESP        = 0x12,
     CHEM_REQ         = 0xD2,

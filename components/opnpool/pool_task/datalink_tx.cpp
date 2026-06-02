@@ -53,15 +53,16 @@ constexpr size_t DATALINK_PREAMBLE_A5_SIZE = sizeof(datalink_preamble_a5);
  * @param[in]  typ  Message type union for the packet.
  */
 static void
-_enter_ic_head(datalink_head_ic_t * const head, datalink_typ_t const typ)
+_enter_ic_head(datalink_head_ic_t * const head, datalink_addr_t const dst, datalink_typ_t const typ)
 {
     head->ff = 0xFF;
     for (uint_least8_t ii = 0; ii < DATALINK_PREAMBLE_IC_SIZE; ii++) {
         head->preamble[ii] = datalink_preamble_ic[ii];
     }
 
-        // 2BD: we know the address of the controller from the broadcast.  use that.
-    head->hdr.dst = datalink_addr_t::suntouch_controller();
+        // address the frame to its intended destination (e.g. the chlorinator for a
+        // CHLOR_LEVEL_SET). Falls back to the controller when no destination was set.
+    head->hdr.dst = dst.addr ? dst : datalink_addr_t::suntouch_controller();
     head->hdr.typ = typ.raw;
 }
 
@@ -135,7 +136,7 @@ datalink_tx_pkt_queue(rs485_handle_t const rs485, datalink_pkt_t const * const p
     switch (pkt->prot) {
         case datalink_prot_t::IC: {
             datalink_head_ic_t * const head = (datalink_head_ic_t *) skb_push(skb, sizeof(datalink_head_ic_t));
-            _enter_ic_head(head, pkt->typ);
+            _enter_ic_head(head, pkt->dst, pkt->typ);
 
             uint8_t * checksum_start = head->preamble;
             uint8_t * checksum_stop = skb->priv.tail;

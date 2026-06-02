@@ -43,7 +43,8 @@ from esphome.const import (
 )
 
 DEPENDENCIES = ["climate", "switch", "sensor", "binary_sensor", "text_sensor", "number", "select"]
-AUTO_LOAD = ["climate", "switch", "sensor", "binary_sensor", "text_sensor", "number", "select"]
+# "api" is auto-loaded so USE_API is defined and the schedule export/import services register.
+AUTO_LOAD = ["climate", "switch", "sensor", "binary_sensor", "text_sensor", "number", "select", "api"]
 
 # namespace and class definitions
 opnpool_ns = cg.esphome_ns.namespace("opnpool")
@@ -112,6 +113,7 @@ CONF_BINARY_SENSORS = [  # used to overwrite binary_sensor_id_t enum in opnpool.
 ]
 CONF_NUMBERS = {  # used to overwrite number_id_t enum in opnpool.h
     "primary_pump_speed_setpoint": {"min": 450.0, "max": 3450.0, "step": 1.0, "unit": UNIT_REVOLUTIONS_PER_MINUTE},
+    "chlorinator_setpoint":        {"min": 0.0,   "max": 100.0,  "step": 1.0, "unit": UNIT_PERCENT},
 }
 CONF_SELECTS = {  # used to overwrite select_id_t enum in opnpool.h
     "light_color": ["Party", "Romance", "Caribbean", "American", "Sunset", "Royal",

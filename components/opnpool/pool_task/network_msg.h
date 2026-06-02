@@ -299,16 +299,32 @@ struct network_ctrl_chem_req_t {
     uint8_t unknown;  // 0xD2
 } PACK8;
 
+    // number of detailed (EasyTouch) schedule slots; sched_id ranges 1..NETWORK_CTRL_SCHEDS_COUNT
+constexpr uint8_t NETWORK_CTRL_SCHEDS_COUNT = 12;
+
 struct network_ctrl_scheds_req_t {
     uint8_t sched_id;  // 0x01 (1 - 12)
 } PACK8;
 
+    // Day-of-week bitmask, confirmed against a real controller (SPA Mon-Fri => 0x3E):
+    //   bit0 Sun (0x01), bit1 Mon (0x02), bit2 Tue (0x04), bit3 Wed (0x08),
+    //   bit4 Thu (0x10), bit5 Fri (0x20), bit6 Sat (0x40). All days = 0x7F.
 struct network_ctrl_scheds_resp_t {
-    uint8_t                sched_id;     // 0 
-    network_pool_circuit_t circuit;      // 1
-    network_time_t         start;        // 2..3
-    network_time_t         stop;         // 4..5
-    uint8_t                day_of_week;  // 6 ///< bitmask Mon (0x01), Tue (0x02), Wed (0x04), Thu(0x08), Fri (0x10), Sat (0x20), Sun(0x40)
+    uint8_t         sched_id;        // 0
+    uint8_t         circuit_plus_1;  // 1 ///< circuit index + 1 (0 = unused slot); confirmed: 0x01 => SPA
+    network_time_t  start;           // 2..3
+    network_time_t  stop;            // 4..5
+    uint8_t         day_of_week;     // 6 ///< Sunday-first bitmask (see note above)
+} PACK8;
+
+    // Payload for setting a detailed schedule slot (same layout as the response).
+    // Verified on hardware: the controller ACKs SCHEDS_SET (0x91) writes.
+struct network_ctrl_scheds_set_t {
+    uint8_t         sched_id;        // 0   ///< schedule slot 1..NETWORK_CTRL_SCHEDS_COUNT
+    uint8_t         circuit_plus_1;  // 1   ///< circuit index + 1 (0 = unused slot)
+    network_time_t  start;           // 2..3
+    network_time_t  stop;            // 4..5
+    uint8_t         day_of_week;     // 6   ///< Sunday-first bitmask (bit0 Sun .. bit6 Sat)
 } PACK8;
 
 struct network_ctrl_heat_resp_t {
@@ -484,8 +500,8 @@ struct network_chlor_model_req_t {
 } PACK8;
 
 struct network_chlor_model_resp_t {
-    uint8_t              salt;  ///< parts per million /50
-    network_chlor_name_t name;  ///< non-\0 terminated chlorinator name
+    uint8_t              unknown;  ///< leading byte; NOT salt (name string starts at offset 1)
+    network_chlor_name_t name;     ///< non-\0 terminated chlorinator name
 } PACK8;
 
 struct network_chlor_level_set_t {
@@ -547,6 +563,7 @@ union network_data_a5_t {
     network_ctrl_circ_names_resp_t ctrl_circ_names_resp;
     network_ctrl_scheds_req_t      ctrl_scheds_req;
     network_ctrl_scheds_resp_t     ctrl_scheds_resp;
+    network_ctrl_scheds_set_t      ctrl_scheds_set;
     network_ctrl_chem_req_t        ctrl_chem_req;
 } PACK8;
 
@@ -630,6 +647,7 @@ union network_data_t {
     X(CTRL_CIRC_NAMES_RESP,  sizeof(network_ctrl_circ_names_resp_t),false, A5_CTRL, datalink_ctrl_typ_t::CIRC_NAMES_RESP) \
     X(CTRL_SCHEDS_REQ,       sizeof(network_ctrl_scheds_req_t),     false, A5_CTRL, datalink_ctrl_typ_t::SCHEDS_REQ)    \
     X(CTRL_SCHEDS_RESP,      sizeof(network_ctrl_scheds_resp_t),    false, A5_CTRL, datalink_ctrl_typ_t::SCHEDS_RESP)   \
+    X(CTRL_SCHEDS_SET,       sizeof(network_ctrl_scheds_set_t),     false, A5_CTRL, datalink_ctrl_typ_t::SCHEDS_SET)    \
     X(CTRL_CHEM_REQ,         sizeof(network_ctrl_chem_req_t),       false, A5_CTRL, datalink_ctrl_typ_t::CHEM_REQ)      \
     X(HEATER_SET,            sizeof(network_heater_set_t),          false, A5_CTRL, datalink_ctrl_typ_t::HEATER_SET)    \
     X(HEATER_RESP,           sizeof(network_heater_resp_t),         false, A5_CTRL, datalink_ctrl_typ_t::HEATER_RESP)   \

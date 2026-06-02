@@ -705,6 +705,50 @@ _ctrl_sched_resp(cJSON * const dbg, network_ctrl_sched_resp_t const * const msg,
 }
 
 /**
+ * @brief       Store one detailed (EasyTouch "SCHEDS" family) schedule slot into the pool state.
+ *
+ * @param dbg         Optional JSON object for verbose debug logging (currently unused here).
+ * @param sched_id    Schedule slot id (1..NETWORK_CTRL_SCHEDS_COUNT).
+ * @param circuit     Circuit the schedule controls.
+ * @param start       Start time (hour:minute).
+ * @param stop        Stop time (hour:minute).
+ * @param day_of_week Day bitmask (Mon 0x01 .. Sun 0x40).
+ * @param state       Pointer to the poolstate_t structure to update.
+ *
+ * Shared by the SCHEDS_RESP handler and the (experimental) SCHEDS_SET echo so a schedule we
+ * write is reflected in state immediately.
+ */
+static void
+_store_sched_detail(cJSON * const dbg, uint8_t const sched_id, uint8_t const circuit_plus_1,
+                    network_time_t const start, network_time_t const stop, uint8_t const day_of_week,
+                    poolstate_t * const state)
+{
+    (void) dbg;
+    if (!state) { ESP_LOGW(TAG, "null to %s", __func__); return; }
+    if (sched_id < 1 || sched_id > NETWORK_CTRL_SCHEDS_COUNT) {
+        ESP_LOGW(TAG, "scheds bad id %u", sched_id);
+        return;
+    }
+    state->scheds_detail[sched_id - 1] = {
+        .valid          = true,
+        .sched_id       = sched_id,
+        .circuit_plus_1 = circuit_plus_1,
+        .start          = start,
+        .stop           = stop,
+        .day_of_week    = day_of_week,
+    };
+    if (ESPHOME_LOG_LEVEL >= ESPHOME_LOG_LEVEL_VERBOSE) {
+        char const * const circuit_name =
+            (circuit_plus_1 >= 1 && circuit_plus_1 <= enum_count<network_pool_circuit_t>())
+                ? enum_str(static_cast<network_pool_circuit_t>(circuit_plus_1 - 1))
+                : "unused";
+        ESP_LOGV(TAG, "sched[%u] circuit=%s %02u:%02u-%02u:%02u days=0x%02X",
+                 sched_id, circuit_name,
+                 start.hour, start.minute, stop.hour, stop.minute, day_of_week);
+    }
+}
+
+/**
  * @brief       Process a controller state broadcast message and update the pool state.
  *
  * @param dbg   Optional JSON object for verbose debug logging.
@@ -845,28 +889,25 @@ _chlor_model_req(cJSON * const dbg, network_chlor_model_req_t const * const msg)
  * @param msg   Pointer to the received network_chlor_model_resp_t message.
  * @param chlor Pointer to the poolstate_chlor_t structure to update.
  *
- * This function updates the chlorine generator name and salt level in the pool state and
- * logs the status to the debug JSON object if verbose logging is enabled.
+ * This function updates the chlorine generator name in the pool state and logs it to the
+ * debug JSON object if verbose logging is enabled. Salt is not carried by this message;
+ * it is reported by LEVEL_RESP (0x12).
  */
 static void
 _chlor_model_resp(cJSON * const dbg, network_chlor_model_resp_t const * const msg, poolstate_chlor_t * const chlor)
 {
     if (!msg || !chlor) { ESP_LOGW(TAG, "null to %s", __func__); return; }
 
-    chlor->salt = {
-        .valid = true,
-        .value = static_cast<uint16_t>(msg->salt * 50)
-    };
-
+        // this message carries only the name; the leading byte is not salt.
+        // salt is reported separately by LEVEL_RESP (0x12).
     uint32_t name_size = sizeof(chlor->name.value);
     strncpy(chlor->name.value, msg->name, name_size);
     chlor->name.value[name_size - 1] = '\0';
     chlor->name.valid = true;
 
     if (ESPHOME_LOG_LEVEL >= ESPHOME_LOG_LEVEL_VERBOSE) {
-        cJSON_AddNumberToObject(dbg, poolstate_rx_log::KEY_SALT, chlor->salt.value);
         cJSON_AddStringToObject(dbg, poolstate_rx_log::KEY_NAME, chlor->name.value);
-        ESP_LOGV(TAG, "Chlorine status updated: salt=%u, name=%s", chlor->salt.value, chlor->name.value);
+        ESP_LOGV(TAG, "Chlorinator name updated: name=%s", chlor->name.value);
     }
 }
 
@@ -1050,9 +1091,16 @@ update_state(network_msg_t const * const msg, poolstate_t * const new_state)
             break;
         case network_msg_typ_t::CTRL_SCHEDS_REQ:
             break;
-        case network_msg_typ_t::CTRL_SCHEDS_RESP:
-            _ctrl_hex_bytes(dbg, msg->u.raw, sizeof(network_ctrl_scheds_resp_t));
+        case network_msg_typ_t::CTRL_SCHEDS_RESP: {
+            auto const & s = msg->u.a5.ctrl_scheds_resp;
+            _store_sched_detail(dbg, s.sched_id, s.circuit_plus_1, s.start, s.stop, s.day_of_week, new_state);
             break;
+        }
+        case network_msg_typ_t::CTRL_SCHEDS_SET: {  // echo of our own schedule write
+            auto const & s = msg->u.a5.ctrl_scheds_set;
+            _store_sched_detail(dbg, s.sched_id, s.circuit_plus_1, s.start, s.stop, s.day_of_week, new_state);
+            break;
+        }
         case network_msg_typ_t::CTRL_CHEM_REQ:
             break;
         case network_msg_typ_t::HEATER_SET:

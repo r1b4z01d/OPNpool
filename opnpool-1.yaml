@@ -71,7 +71,9 @@ captive_portal:
 
 api:
   encryption:
-    key: !secret api_encryption_key 
+    key: !secret api_encryption_key
+  custom_services: true          # required for the export_schedules / import_schedule services
+  homeassistant_services: true   # required for export_schedules to fire its YAML event
 
 ota:
   - platform: esphome
@@ -141,6 +143,16 @@ opnpool:
     state_class: "measurement"
     device_class: "temperature"
     unit_of_measurement: "°F"
+  solar1_temperature:
+    name: "Solar1 water"
+    state_class: "measurement"
+    device_class: "temperature"
+    unit_of_measurement: "°F"
+  solar2_temperature:
+    name: "Solar2 water"
+    state_class: "measurement"
+    device_class: "temperature"
+    unit_of_measurement: "°F"
   air_temperature:
     name: "Outside air"
     state_class: "measurement"
@@ -182,6 +194,19 @@ opnpool:
   # number controls
   primary_pump_speed_setpoint:
     name: "Pump speed setpoint"
+  chlorinator_setpoint:
+    name: "Chlorinator setpoint"
+
+  # Home Assistant services exposed by this component (no YAML config needed):
+  #   - esphome.<device>_export_schedules         -> logs current schedules as YAML and
+  #                                                   fires event "esphome.opnpool_schedules_export" {yaml: ...}
+  #   - esphome.<device>_import_schedule {yaml: }  -> writes schedules to the controller (EXPERIMENTAL)
+  # import YAML format (one flow-style entry per line):
+  #   schedules:
+  #     - {id: 1, circuit: POOL, start: "09:00", stop: "19:00", days: "SMTWTFS"}
+  #     - {id: 3, circuit: SPA,  start: "07:00", stop: "16:59", days: "-MTWTF-"}
+  # days: 7 positional chars Sun..Sat (S M T W T F S); a letter = on, '-' = off.
+  # (Sunday-first to match the controller's bitmask: Mon-Fri = 0x3E.)
 
   # binary sensors
   primary_pump_running:
