@@ -845,28 +845,25 @@ _chlor_model_req(cJSON * const dbg, network_chlor_model_req_t const * const msg)
  * @param msg   Pointer to the received network_chlor_model_resp_t message.
  * @param chlor Pointer to the poolstate_chlor_t structure to update.
  *
- * This function updates the chlorine generator name and salt level in the pool state and
- * logs the status to the debug JSON object if verbose logging is enabled.
+ * This function updates the chlorine generator name in the pool state and logs it to the
+ * debug JSON object if verbose logging is enabled. Salt is not carried by this message;
+ * it is reported by LEVEL_RESP (0x12).
  */
 static void
 _chlor_model_resp(cJSON * const dbg, network_chlor_model_resp_t const * const msg, poolstate_chlor_t * const chlor)
 {
     if (!msg || !chlor) { ESP_LOGW(TAG, "null to %s", __func__); return; }
 
-    chlor->salt = {
-        .valid = true,
-        .value = static_cast<uint16_t>(msg->salt * 50)
-    };
-
+        // this message carries only the name; the leading byte is not salt.
+        // salt is reported separately by LEVEL_RESP (0x12).
     uint32_t name_size = sizeof(chlor->name.value);
     strncpy(chlor->name.value, msg->name, name_size);
     chlor->name.value[name_size - 1] = '\0';
     chlor->name.valid = true;
 
     if (ESPHOME_LOG_LEVEL >= ESPHOME_LOG_LEVEL_VERBOSE) {
-        cJSON_AddNumberToObject(dbg, poolstate_rx_log::KEY_SALT, chlor->salt.value);
         cJSON_AddStringToObject(dbg, poolstate_rx_log::KEY_NAME, chlor->name.value);
-        ESP_LOGV(TAG, "Chlorine status updated: salt=%u, name=%s", chlor->salt.value, chlor->name.value);
+        ESP_LOGV(TAG, "Chlorinator name updated: name=%s", chlor->name.value);
     }
 }
 

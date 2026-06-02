@@ -109,6 +109,7 @@ class OpnPool : public Component {
 
     // ========== Number Setters ==========
     void set_primary_pump_speed_setpoint_number(OpnPoolNumber * const n);
+    void set_chlorinator_setpoint_number(OpnPoolNumber * const n);
 
     // ========== Select Setters ==========
     void set_light_color_select(OpnPoolSelect * const s);

@@ -71,7 +71,7 @@ captive_portal:
 
 api:
   encryption:
-    key: !secret api_encryption_key 
+    key: !secret api_encryption_key
 
 ota:
   - platform: esphome
@@ -182,6 +182,8 @@ opnpool:
   # number controls
   primary_pump_speed_setpoint:
     name: "Pump speed setpoint"
+  chlorinator_setpoint:
+    name: "Chlorinator setpoint"
 
   # binary sensors
   primary_pump_running:

@@ -51,15 +51,37 @@ OpnPoolNumber::dump_config()
 }
 
 /**
- * @brief Sends the pump speed command sequence when Home Assistant changes the value.
+ * @brief Dispatches a Home Assistant value change to the matching handler.
  *
- * @param[in] value Desired pump speed in RPM (450 – 3450).
+ * @param[in] value Desired value (RPM for the pump speed entity, % for the chlorinator).
  */
 void
 OpnPoolNumber::control(float value)
 {
     if (!this->parent_) { ESP_LOGW(TAG, "Parent unknown"); return; }
 
+    switch (id_) {
+        case number_id_t::PRIMARY_PUMP_SPEED_SETPOINT:
+            this->control_pump_speed_(value);
+            break;
+        case number_id_t::CHLORINATOR_SETPOINT:
+            this->control_chlor_level_(value);
+            break;
+        default:
+            ESP_LOGW(TAG, "Unhandled number id %u", static_cast<uint8_t>(id_));
+            break;
+    }
+    // DON'T publish state here — wait for confirmation from the bus.
+}
+
+/**
+ * @brief Sends the pump speed command sequence when Home Assistant changes the value.
+ *
+ * @param[in] value Desired pump speed in RPM (450 – 3450).
+ */
+void
+OpnPoolNumber::control_pump_speed_(float value)
+{
     PoolState * const state_class_ptr = parent_->get_opnpool_state();
     if (!state_class_ptr) { ESP_LOGW(TAG, "Pool state unknown"); return; }
 
@@ -112,6 +134,37 @@ OpnPoolNumber::control(float value)
 
     ESP_LOGV(TAG, "Sent pump speed command: %u RPM", rpm);
     // DON'T publish state here — wait for PUMP_STATUS_RESP confirmation.
+}
+
+/**
+ * @brief Sends a CHLOR_LEVEL_SET command to the IntelliChlor when Home Assistant changes the value.
+ *
+ * @details
+ * The IC protocol is addressed to the chlorinator (0x50); unlike the A5 control messages it
+ * does not require the learned controller address. The confirmed level is published back to
+ * Home Assistant from poolstate.chlor.level (updated by the echoed/broadcast CHLOR_LEVEL_SET).
+ *
+ * @param[in] value Desired chlorine output level (0–100 %).
+ */
+void
+OpnPoolNumber::control_chlor_level_(float value)
+{
+    if (value < 0.f)   value = 0.f;
+    if (value > 100.f) value = 100.f;
+
+    network_msg_t msg;
+    msg.src = datalink_addr_t::wireless_remote();  // IC frames carry no src; set for consistency
+    msg.dst = datalink_addr_t::chlorinator();      // 0x50
+    msg.typ = network_msg_typ_t::CHLOR_LEVEL_SET;
+    msg.u.ic.chlor_level_set = {
+        .level = static_cast<uint8_t>(value)
+    };
+
+    ESP_LOGV(TAG, "Sending CHLOR_LEVEL_SET: %u%%", msg.u.ic.chlor_level_set.level);
+    if (ipc_send_network_msg_to_pool_task(&msg, this->parent_->get_ipc()) != ESP_OK) {
+        ESP_LOGW(TAG, "Failed to send CHLOR_LEVEL_SET message to pool task");
+    }
+    // DON'T publish state here — wait for the chlorinator level confirmation on the bus.
 }
 
 /**

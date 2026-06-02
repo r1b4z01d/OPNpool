@@ -74,6 +74,7 @@ enum class binary_sensor_id_t : uint8_t {
     /// @brief Number entity identifiers for pool numeric controls.
 enum class number_id_t : uint8_t {
     PRIMARY_PUMP_SPEED_SETPOINT = 0,  ///< Primary pump speed setpoint (RPM).
+    CHLORINATOR_SETPOINT        = 1,  ///< Chlorinator output level setpoint (%).
 };
 
     /// @brief Select entity identifiers for pool dropdown controls.

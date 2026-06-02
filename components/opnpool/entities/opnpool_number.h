@@ -61,13 +61,27 @@ class OpnPoolNumber : public number::Number, public Component {
 
   protected:
     /**
-     * @brief Handles speed change requests from Home Assistant.
+     * @brief Dispatches a value change from Home Assistant to the matching handler.
      *
-     * Sends PUMP_REMOTE_CTRL_SET → PUMP_REG_VS_SET → PUMP_RUN_SET to the pump.
+     * Routes on the entity id: pump speed (RPM) or chlorinator output level (%).
+     *
+     * @param[in] value The desired value (RPM or %, depending on the entity).
+     */
+    void control(float value) override;
+
+    /**
+     * @brief Sends the pump speed command sequence (remote-ctrl enable → VS set → run).
      *
      * @param[in] value The desired speed in RPM.
      */
-    void control(float value) override;
+    void control_pump_speed_(float value);
+
+    /**
+     * @brief Sends a CHLOR_LEVEL_SET command to the IntelliChlor chlorinator.
+     *
+     * @param[in] value The desired chlorine output level (0–100 %).
+     */
+    void control_chlor_level_(float value);
 
     OpnPool * const   parent_;  ///< Parent OpnPool component.
     number_id_t const id_;      ///< Number entity ID.

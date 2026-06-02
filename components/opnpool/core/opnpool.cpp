@@ -612,6 +612,12 @@ OpnPool::update_numbers(poolstate_t const * const state)
     if (speed_number != nullptr && speed.valid) {
         speed_number->publish_value_if_changed(static_cast<float>(speed.value));
     }
+
+    OpnPoolNumber * const chlor_number = this->numbers_[enum_index(number_id_t::CHLORINATOR_SETPOINT)];
+    auto const & chlor_level = state->chlor.level;
+    if (chlor_number != nullptr && chlor_level.valid) {
+        chlor_number->publish_value_if_changed(static_cast<float>(chlor_level.value));
+    }
 }
 
 /**
@@ -799,6 +805,12 @@ void
 OpnPool::set_primary_pump_speed_setpoint_number(OpnPoolNumber * const n)
 {
     this->numbers_[enum_index(number_id_t::PRIMARY_PUMP_SPEED_SETPOINT)] = n;
+}
+
+void
+OpnPool::set_chlorinator_setpoint_number(OpnPoolNumber * const n)
+{
+    this->numbers_[enum_index(number_id_t::CHLORINATOR_SETPOINT)] = n;
 }
 
 void
